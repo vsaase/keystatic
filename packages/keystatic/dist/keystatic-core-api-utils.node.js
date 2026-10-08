@@ -1,0 +1,12 @@
+export { g as getAllowedDirectories } from './read-local-49e66871.node.js';
+import 'fs/promises';
+import 'path';
+import './index-784e2e8e.node.js';
+import '@markdoc/markdoc/dist/index.mjs';
+import 'emery/assertions';
+import 'emery';
+import './index-1a9da0fb.node.js';
+import 'react/jsx-runtime';
+import 'crypto';
+import '@braintree/sanitize-url';
+import 'ignore';

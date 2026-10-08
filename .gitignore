@@ -43,7 +43,13 @@ node_modules/
 .vercel
 
 # Preconstruct build output
-dist
+**/dist/
+!packages/keystatic/dist/
+!packages/keystatic/dist/**
+!packages/next/dist/
+!packages/next/dist/**
+!design-system/pkg/dist/
+!design-system/pkg/dist/**
 
 # Docs
 design-system/docs/generated
