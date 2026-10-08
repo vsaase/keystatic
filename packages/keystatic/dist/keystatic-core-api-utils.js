@@ -3,7 +3,7 @@ import 'path';
 import { d as getDirectoriesForTreeKey, p as getCollectionPath, o as object, ab as getSingletonFormat, ac as getSingletonPath } from './index-1939bcf3.js';
 import 'react';
 import '@keystar/ui/picker';
-import './index-cd3e9986.js';
+import './index-6929744e.js';
 import 'react/jsx-runtime';
 import '@keystar/ui/button';
 import '@keystar/ui/dialog';

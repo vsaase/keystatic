@@ -9,7 +9,8 @@ export function serializeProps(
   // note you might have a slug without a slug field when serializing props inside a component block or etc. in the editor
   slugField: string | undefined,
   slug: string | undefined,
-  shouldSuggestFilenamePrefix: boolean
+  shouldSuggestFilenamePrefix: boolean,
+  serializeContentAsString = false
 ) {
   const extraFiles: {
     path: string;
@@ -48,9 +49,12 @@ export function serializeProps(
         }
         if (schema.formKind === 'content' || schema.formKind === 'assets') {
           let other: ReadonlyMap<string, Uint8Array>, external, forYaml;
+          let contentForPreview: string | undefined;
           if (schema.formKind === 'content') {
             const out = schema.serialize(value, { slug });
-            if (out.content) {
+            if (out.content && serializeContentAsString) {
+              contentForPreview = new TextDecoder().decode(out.content);
+            } else if (out.content) {
               extraFiles.push({
                 path:
                   getPropPathPortion(propPath, rootSchema, rootValue) +
@@ -88,7 +92,9 @@ export function serializeProps(
               });
             }
           }
-          return forYaml;
+          return serializeContentAsString && schema.formKind === 'content'
+            ? contentForPreview
+            : forYaml;
         }
         return schema.serialize(value).value;
       },

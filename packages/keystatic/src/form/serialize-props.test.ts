@@ -18,7 +18,8 @@ const serializeProps: <Schema extends ComponentSchema>(
   // note you might have a slug without a slug field when serializing props inside a component block or etc. in the editor
   slugField: string | undefined,
   slug: string | undefined,
-  shouldSuggestFilenamePrefix: boolean
+  shouldSuggestFilenamePrefix: boolean,
+  serializeContentAsString?: boolean
 ) => {
   value: unknown;
   extraFiles: {
@@ -78,6 +79,53 @@ test('serialize image in collection', () => {
       },
     }
   `);
+
+  const preview = serializeProps(val, schema, 'slug', val.slug, false, true);
+  expect(preview.value).toEqual({ image: 'image.png' });
+  expect(preview.extraFiles).toEqual([
+    {
+      path: 'image.png',
+      parent: undefined,
+      contents: new Uint8Array([1]),
+    },
+  ]);
+});
+
+test('serialize rich-text fields and booleans for a live preview', () => {
+  const schema = fields.object({
+    body: fields.markdoc({ label: 'Body', extension: 'md' }),
+    inline: fields.markdoc.inline({ label: 'Inline text' }),
+    enabled: fields.checkbox({ label: 'Enabled' }),
+  });
+  const entry = {
+    body: schema.fields.body.parse(undefined, {
+      content: new TextEncoder().encode('Live body text'),
+      other: new Map(),
+      external: new Map(),
+      slug: undefined,
+    }),
+    inline: schema.fields.inline.parse('Live inline text', {
+      other: new Map(),
+      external: new Map(),
+      slug: undefined,
+    }),
+    enabled: true,
+  };
+
+  const serialized = serializeProps(
+    entry,
+    schema,
+    undefined,
+    undefined,
+    false,
+    true
+  );
+  expect(serialized.value).toEqual({
+    body: 'Live body text\n',
+    inline: 'Live inline text\n',
+    enabled: true,
+  });
+  expect(serialized.extraFiles).toEqual([]);
 });
 
 test('preserve images in a shared directory when editing an entry', () => {

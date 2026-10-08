@@ -10,6 +10,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import * as Y from 'yjs';
@@ -92,6 +93,7 @@ import { ErrorBoundary } from './error-boundary';
 import { copyEntryToClipboard, getPastedEntry } from './entry-clipboard';
 import { setValueToPreviewProps } from '../form/get-value';
 import { toastQueue } from '@keystar/ui/toast';
+import { serializeProps } from '../form/serialize-props';
 
 type ItemPageProps = {
   collection: string;
@@ -110,6 +112,25 @@ const storedValSchema = s.type({
   beforeTreeKey: s.string(),
   files: s.map(s.string(), s.instance(Uint8Array)),
 });
+
+type SerializedPreviewAsset = {
+  path: string;
+  parent: string | undefined;
+  contents: Uint8Array;
+};
+
+function previewAssetKey(asset: SerializedPreviewAsset) {
+  return `${asset.parent ?? ''}/${asset.path}`;
+}
+
+function sameAssetContents(left: Uint8Array, right: Uint8Array) {
+  if (left === right) return true;
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index++) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
 
 function ItemPageInner(
   props: ItemPageProps & {
@@ -133,6 +154,67 @@ function ItemPageInner(
     onUpdate: parentOnUpdate,
   } = props;
   const { collectionConfig, schema } = useCollection(collection);
+  const initialAssetContents = useMemo(() => {
+    const serialized = serializeProps(
+      props.initialState,
+      schema,
+      collectionConfig.slugField,
+      getSlugFromState(collectionConfig, props.initialState),
+      false
+    );
+    return new Map(
+      serialized.extraFiles.map(asset => [previewAssetKey(asset), asset.contents])
+    );
+  }, [collectionConfig, props.initialState, schema]);
+  const sentPreviewAssets = useRef(new Map<string, Uint8Array>());
+
+  useEffect(() => {
+    try {
+      const serialized = serializeProps(
+        props.state,
+        schema,
+        collectionConfig.slugField,
+        getSlugFromState(collectionConfig, props.state),
+        false,
+        true
+      );
+      const activeAssets = serialized.extraFiles.filter(asset => {
+        const initialContents = initialAssetContents.get(previewAssetKey(asset));
+        return (
+          initialContents === undefined ||
+          !sameAssetContents(initialContents, asset.contents)
+        );
+      });
+      const assetsToSend = activeAssets.filter(asset => {
+        const key = previewAssetKey(asset);
+        const sentContents = sentPreviewAssets.current.get(key);
+        return !sentContents || !sameAssetContents(sentContents, asset.contents);
+      });
+      window.postMessage(
+        {
+          type: 'keystatic:entry-change',
+          collection,
+          slug: itemSlug,
+          entry: serialized.value,
+          assets: assetsToSend,
+          activeAssetKeys: activeAssets.map(previewAssetKey),
+        },
+        window.location.origin
+      );
+      for (const asset of assetsToSend) {
+        sentPreviewAssets.current.set(previewAssetKey(asset), asset.contents);
+      }
+    } catch (error) {
+      console.error('Unable to send unsaved entry data to the live preview.', error);
+    }
+  }, [
+    collection,
+    collectionConfig.slugField,
+    initialAssetContents,
+    itemSlug,
+    props.state,
+    schema,
+  ]);
 
   const router = useRouter();
   const baseCommit = useBaseCommit();

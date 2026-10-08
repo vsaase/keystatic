@@ -1,6 +1,6 @@
-import { z as useFieldSpan, s as strings, A as useArrayFieldValidationMessage, B as ArrayFieldListView, D as FormValueContentFromPreviewProps, o as getInitialPropsValue, h as createGetPreviewProps, m as clientSideValidateProp, E as valueToUpdater, G as isValidURL, H as useIsInDocumentEditor, I as useObjectURL, J as getUploadedFile, K as getSrcPrefix, L as ImageFieldInput, v as pluralize, M as document, N as mdx, O as markdoc } from './index-cd3e9986.js';
-export { V as BlockWrapper, W as ToolbarSeparator, R as collection, Q as config, U as singleton } from './index-cd3e9986.js';
-export { c as component } from './api-2a1d4d68.js';
+import { z as useFieldSpan, s as strings, A as useArrayFieldValidationMessage, B as ArrayFieldListView, D as FormValueContentFromPreviewProps, o as getInitialPropsValue, h as createGetPreviewProps, m as clientSideValidateProp, E as valueToUpdater, G as isValidURL, H as useIsInDocumentEditor, I as useObjectURL, J as getUploadedFile, K as getSrcPrefix, L as ImageFieldInput, v as pluralize, M as document, N as mdx, O as markdoc } from './index-6929744e.js';
+export { V as BlockWrapper, W as ToolbarSeparator, R as collection, Q as config, U as singleton } from './index-6929744e.js';
+export { c as component } from './api-5842fa28.js';
 import { a$ as basicFormFieldWithSimpleReaderParse, ar as FieldDataError, am as useImageLibraryURL, W as useEventCallback, z as useConfig, b2 as emptyImageData, b3 as ImageDimensionsInput, b4 as parseImageData, b5 as loadImageData, b6 as UploadImageButton, o as object, b0 as text, b7 as assertRequired, a_ as fixPath, a as useTree, b8 as SlugFieldContext, b9 as PathContext, ba as validateText } from './index-1939bcf3.js';
 export { aK as NotEditable } from './index-1939bcf3.js';
 import { c } from './react-compiler-runtime-0011f46e.js';

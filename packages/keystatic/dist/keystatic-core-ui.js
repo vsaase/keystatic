@@ -20,7 +20,7 @@ import { ProgressCircle } from '@keystar/ui/progress';
 import { SearchField } from '@keystar/ui/search-field';
 import { useMediaQuery, breakpointQueries, css, tokenSchema, injectGlobal, containerQueries, classNames, transition } from '@keystar/ui/style';
 import { TableView, TableHeader, Column, TableBody, Cell, Row } from '@keystar/ui/table';
-import { p as parseProps, t as toFormattedFormDataError, s as strings, P as PageRoot, a as PageHeader, b as setKeysForArrayValue, g as getKeysForArrayValue, u as useTheme, T as ThemeProvider, c as serializeProps, d as getNewArrayElementKey, e as updateValue, f as getInitialPropsValueFromInitializer, h as createGetPreviewProps, i as PageBody, j as containerWidthForEntryLayout, k as useCreateBranchMutation, l as prettyErrorForCreateBranchMutation, F as FormForEntry, m as clientSideValidateProp, n as setValueToPreviewProps, o as getInitialPropsValue, q as useAssociatedPullRequest, C as CreateBranchDialog, r as useNavItems, v as pluralize, w as useSidebar, S as SidebarDialog, x as SidebarPanel, y as SidebarProvider } from './index-cd3e9986.js';
+import { p as parseProps, t as toFormattedFormDataError, s as strings, P as PageRoot, a as PageHeader, b as setKeysForArrayValue, g as getKeysForArrayValue, u as useTheme, T as ThemeProvider, c as serializeProps, d as getNewArrayElementKey, e as updateValue, f as getInitialPropsValueFromInitializer, h as createGetPreviewProps, i as PageBody, j as containerWidthForEntryLayout, k as useCreateBranchMutation, l as prettyErrorForCreateBranchMutation, m as clientSideValidateProp, n as setValueToPreviewProps, F as FormForEntry, o as getInitialPropsValue, q as useAssociatedPullRequest, C as CreateBranchDialog, r as useNavItems, v as pluralize, w as useSidebar, S as SidebarDialog, x as SidebarPanel, y as SidebarProvider } from './index-6929744e.js';
 import { u as useRouter, g as getEntryDataFilepath, o as object, a as useTree, b as useBaseCommit, c as useRepoInfo, d as getDirectoriesForTreeKey, e as getTreeKey, f as useData, L as LOADING, h as getTreeNodeAtPath, i as getBlobFromPersistedCache, s as setBlobToPersistedCache, j as blobSha, k as serializeRepoConfig, l as getPathPrefix, m as getAuth, K as KEYSTATIC_CLOUD_API_URL, n as KEYSTATIC_CLOUD_HEADERS, p as getCollectionPath, q as useCurrentBranch, r as isLocalConfig, t as getEntriesInCollectionWithTreeKey, v as getCollectionFormat, w as getCollectionItemPath, x as getSlugGlobForCollection, y as parseRepoConfig, G as GitHubAppShellQuery, z as useConfig, A as useCloudInfo, B as useAwarenessStates, C as getSyncAuth, D as redirectToCloudAuth, E as CloudAppShellQuery, F as useSetTreeSha, H as useCurrentUnscopedTree, I as updateTreeWithChanges, J as hydrateTreeCacheWithEntries, M as scopeEntriesWithPathPrefix, N as fetchGitHubTreeData, O as treeSha, P as getSlugFromState, Q as useYjs, R as getDraft, S as useYjsIfAvailable, T as getCollection, U as suspendOnData, V as useShowRestoredDraftMessage, W as useEventCallback, X as getBranchPrefix, Y as getRepoUrl, Z as getDataFileExtension, _ as isGitHubConfig, $ as setDraft, a0 as delDraft, a1 as useViewer, a2 as useContentPanelState, a3 as ContentPanelProvider, a4 as AppShellErrorContext, a5 as AppStateContext, a6 as ConfigContext, a7 as GitHubAppShellProvider, a8 as LocalAppShellProvider, a9 as useBranches, aa as GitHubAppShellDataContext, ab as getSingletonFormat, ac as getSingletonPath, ad as isCloudConfig, ae as assertValidRepoConfig, af as RouterProvider, ag as CloudInfoProvider, ah as GitHubAppShellDataProvider } from './index-1939bcf3.js';
 import { jsxs, Fragment, jsx } from 'react/jsx-runtime';
 import { LRUCache } from 'lru-cache';
@@ -2839,9 +2839,20 @@ const storedValSchema$2 = s.type({
   beforeTreeKey: s.string(),
   files: s.map(s.string(), s.instance(Uint8Array))
 });
+function previewAssetKey(asset) {
+  var _asset$parent;
+  return `${(_asset$parent = asset.parent) !== null && _asset$parent !== void 0 ? _asset$parent : ''}/${asset.path}`;
+}
+function sameAssetContents(left, right) {
+  if (left === right) return true;
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index++) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
 function ItemPageInner(props) {
   var _getPathPrefix, _getPathPrefix2;
-  const $ = c(115);
   const {
     collection,
     config,
@@ -2853,428 +2864,215 @@ function ItemPageInner(props) {
     collectionConfig,
     schema
   } = useCollection(collection);
+  const initialAssetContents = useMemo(() => {
+    const serialized = serializeProps(props.initialState, schema, collectionConfig.slugField, getSlugFromState(collectionConfig, props.initialState), false);
+    return new Map(serialized.extraFiles.map(asset => [previewAssetKey(asset), asset.contents]));
+  }, [collectionConfig, props.initialState, schema]);
+  const sentPreviewAssets = useRef(new Map());
+  useEffect(() => {
+    try {
+      const serialized_0 = serializeProps(props.state, schema, collectionConfig.slugField, getSlugFromState(collectionConfig, props.state), false, true);
+      const activeAssets = serialized_0.extraFiles.filter(asset_0 => {
+        const initialContents = initialAssetContents.get(previewAssetKey(asset_0));
+        return initialContents === undefined || !sameAssetContents(initialContents, asset_0.contents);
+      });
+      const assetsToSend = activeAssets.filter(asset_1 => {
+        const key = previewAssetKey(asset_1);
+        const sentContents = sentPreviewAssets.current.get(key);
+        return !sentContents || !sameAssetContents(sentContents, asset_1.contents);
+      });
+      window.postMessage({
+        type: 'keystatic:entry-change',
+        collection,
+        slug: itemSlug,
+        entry: serialized_0.value,
+        assets: assetsToSend,
+        activeAssetKeys: activeAssets.map(previewAssetKey)
+      }, window.location.origin);
+      for (const asset_2 of assetsToSend) {
+        sentPreviewAssets.current.set(previewAssetKey(asset_2), asset_2.contents);
+      }
+    } catch (error) {
+      console.error('Unable to send unsaved entry data to the live preview.', error);
+    }
+  }, [collection, collectionConfig.slugField, initialAssetContents, itemSlug, props.state, schema]);
   const router = useRouter();
   const baseCommit = useBaseCommit();
-  let t0;
-  if ($[0] !== config || $[1] !== collection || $[2] !== itemSlug) {
-    t0 = getCollectionItemPath(config, collection, itemSlug);
-    $[0] = config;
-    $[1] = collection;
-    $[2] = itemSlug;
-    $[3] = t0;
-  } else {
-    t0 = $[3];
-  }
-  const currentBasePath = t0;
-  let t1;
-  if ($[4] !== config || $[5] !== collection) {
-    t1 = getCollectionFormat(config, collection);
-    $[4] = config;
-    $[5] = collection;
-    $[6] = t1;
-  } else {
-    t1 = $[6];
-  }
-  const formatInfo = t1;
+  const currentBasePath = getCollectionItemPath(config, collection, itemSlug);
+  const formatInfo = getCollectionFormat(config, collection);
   const currentBranch = useCurrentBranch();
   const repoInfo = useRepoInfo();
   const [forceValidation, setForceValidation] = useState(false);
-  let t2;
-  if ($[7] !== collectionConfig.previewUrl || $[8] !== props || $[9] !== currentBranch) {
-    t2 = collectionConfig.previewUrl ? collectionConfig.previewUrl.replace("{slug}", props.itemSlug).replace("{branch}", currentBranch) : undefined;
-    $[7] = collectionConfig.previewUrl;
-    $[8] = props;
-    $[9] = currentBranch;
-    $[10] = t2;
-  } else {
-    t2 = $[10];
-  }
-  const previewHref = t2;
+  const previewHref = collectionConfig.previewUrl ? collectionConfig.previewUrl.replace('{slug}', props.itemSlug).replace('{branch}', currentBranch) : undefined;
   const {
     push,
     replace
   } = router;
   const slugInfo = useSlugFieldInfo(collection, itemSlug);
-  let t3;
-  if ($[11] !== props.initialFiles || $[12] !== config.storage || $[13] !== currentBasePath) {
-    t3 = {
-      initialFiles: props.initialFiles,
-      storage: config.storage,
-      basePath: currentBasePath
-    };
-    $[11] = props.initialFiles;
-    $[12] = config.storage;
-    $[13] = currentBasePath;
-    $[14] = t3;
-  } else {
-    t3 = $[14];
-  }
-  const [deleteResult, deleteItem, resetDeleteItem] = useDeleteItem(t3);
-  let t4;
-  if ($[15] !== deleteItem || $[16] !== push || $[17] !== props.basePath || $[18] !== collection) {
-    t4 = async () => {
-      if (await deleteItem()) {
-        push(`${props.basePath}/collection/${encodeURIComponent(collection)}`);
-      }
-    };
-    $[15] = deleteItem;
-    $[16] = push;
-    $[17] = props.basePath;
-    $[18] = collection;
-    $[19] = t4;
-  } else {
-    t4 = $[19];
-  }
-  const onDelete = useEventCallback(t4);
-  let t5;
-  if ($[20] !== push || $[21] !== props.basePath || $[22] !== collection || $[23] !== itemSlug) {
-    t5 = () => {
-      push(`${props.basePath}/collection/${encodeURIComponent(collection)}/create?duplicate=${itemSlug}`);
-    };
-    $[20] = push;
-    $[21] = props.basePath;
-    $[22] = collection;
-    $[23] = itemSlug;
-    $[24] = t5;
-  } else {
-    t5 = $[24];
-  }
-  const onDuplicate = t5;
-  const isSavingDisabled = updateResult.kind === "loading" || !props.hasChanged;
-  let t6;
-  if ($[25] !== isSavingDisabled || $[26] !== schema || $[27] !== props.state || $[28] !== props.basePath || $[29] !== slugInfo || $[30] !== collectionConfig || $[31] !== parentOnUpdate || $[32] !== itemSlug || $[33] !== replace || $[34] !== collection) {
-    t6 = async () => {
-      if (isSavingDisabled) {
-        return false;
-      }
-      if (!clientSideValidateProp(schema, props.state, slugInfo)) {
-        setForceValidation(true);
-        return false;
-      }
-      const slug = getSlugFromState(collectionConfig, props.state);
-      const hasUpdated = await parentOnUpdate();
-      if (hasUpdated && slug !== itemSlug) {
-        replace(`${props.basePath}/collection/${encodeURIComponent(collection)}/item/${encodeURIComponent(slug)}`);
-      }
-      return hasUpdated;
-    };
-    $[25] = isSavingDisabled;
-    $[26] = schema;
-    $[27] = props.state;
-    $[28] = props.basePath;
-    $[29] = slugInfo;
-    $[30] = collectionConfig;
-    $[31] = parentOnUpdate;
-    $[32] = itemSlug;
-    $[33] = replace;
-    $[34] = collection;
-    $[35] = t6;
-  } else {
-    t6 = $[35];
-  }
-  const onUpdate = useEventCallback(t6);
-  let t7;
-  if ($[36] !== props.state || $[37] !== formatInfo || $[38] !== collectionConfig) {
-    t7 = () => {
-      copyEntryToClipboard(props.state, formatInfo, collectionConfig.schema, {
-        field: collectionConfig.slugField,
-        value: getSlugFromState(collectionConfig, props.state)
-      });
-    };
-    $[36] = props.state;
-    $[37] = formatInfo;
-    $[38] = collectionConfig;
-    $[39] = t7;
-  } else {
-    t7 = $[39];
-  }
-  const onCopy = useEventCallback(t7);
-  let t8;
-  if ($[40] !== formatInfo || $[41] !== collectionConfig || $[42] !== props.state || $[43] !== props.previewProps) {
-    t8 = async () => {
-      const entry = await getPastedEntry(formatInfo, collectionConfig.schema, {
-        field: collectionConfig.slugField,
-        slug: getSlugFromState(collectionConfig, props.state)
-      });
-      if (entry) {
-        setValueToPreviewProps(entry, props.previewProps);
-        toastQueue.positive("Entry pasted", {
-          shouldCloseOnAction: true,
-          actionLabel: "Undo",
-          onAction: () => {
-            setValueToPreviewProps(props.state, props.previewProps);
-          }
-        });
-      }
-    };
-    $[40] = formatInfo;
-    $[41] = collectionConfig;
-    $[42] = props.state;
-    $[43] = props.previewProps;
-    $[44] = t8;
-  } else {
-    t8 = $[44];
-  }
-  const onPaste = useEventCallback(t8);
-  const viewHref = config.storage.kind !== "local" && repoInfo ? `${getRepoUrl(repoInfo)}${formatInfo.dataLocation === "index" ? `/tree/${currentBranch}/${(_getPathPrefix = getPathPrefix(config.storage)) !== null && _getPathPrefix !== void 0 ? _getPathPrefix : ""}${currentBasePath}` : `/blob/${currentBranch}/${(_getPathPrefix2 = getPathPrefix(config.storage)) !== null && _getPathPrefix2 !== void 0 ? _getPathPrefix2 : ""}${currentBasePath}${getDataFileExtension(formatInfo)}`}` : undefined;
-  let t9;
-  let t10;
-  if ($[45] !== updateResult.kind || $[46] !== onUpdate) {
-    t9 = () => {
-      const listener = event => {
-        if (updateResult.kind === "loading") {
-          return;
+  const [deleteResult, deleteItem, resetDeleteItem] = useDeleteItem({
+    initialFiles: props.initialFiles,
+    storage: config.storage,
+    basePath: currentBasePath
+  });
+  const onDelete = useEventCallback(async () => {
+    // TODO: delete multiplayer draft
+    if (await deleteItem()) {
+      push(`${props.basePath}/collection/${encodeURIComponent(collection)}`);
+    }
+  });
+  const onDuplicate = () => {
+    push(`${props.basePath}/collection/${encodeURIComponent(collection)}/create?duplicate=${itemSlug}`);
+  };
+  const isSavingDisabled = updateResult.kind === 'loading' || !props.hasChanged;
+  const onUpdate = useEventCallback(async () => {
+    if (isSavingDisabled) return false;
+    if (!clientSideValidateProp(schema, props.state, slugInfo)) {
+      setForceValidation(true);
+      return false;
+    }
+    const slug = getSlugFromState(collectionConfig, props.state);
+    const hasUpdated = await parentOnUpdate();
+    if (hasUpdated && slug !== itemSlug) {
+      replace(`${props.basePath}/collection/${encodeURIComponent(collection)}/item/${encodeURIComponent(slug)}`);
+    }
+    return hasUpdated;
+  });
+  const onCopy = useEventCallback(() => {
+    copyEntryToClipboard(props.state, formatInfo, collectionConfig.schema, {
+      field: collectionConfig.slugField,
+      value: getSlugFromState(collectionConfig, props.state)
+    });
+  });
+  const onPaste = useEventCallback(async () => {
+    const entry = await getPastedEntry(formatInfo, collectionConfig.schema, {
+      field: collectionConfig.slugField,
+      slug: getSlugFromState(collectionConfig, props.state)
+    });
+    if (entry) {
+      setValueToPreviewProps(entry, props.previewProps);
+      toastQueue.positive('Entry pasted', {
+        shouldCloseOnAction: true,
+        actionLabel: 'Undo',
+        onAction: () => {
+          setValueToPreviewProps(props.state, props.previewProps);
         }
-        if (isHotkey("mod+s", event)) {
-          event.preventDefault();
-          onUpdate();
-        }
-      };
-      document.addEventListener("keydown", listener);
-      return () => document.removeEventListener("keydown", listener);
-    };
-    t10 = [updateResult.kind, onUpdate];
-    $[45] = updateResult.kind;
-    $[46] = onUpdate;
-    $[47] = t9;
-    $[48] = t10;
-  } else {
-    t9 = $[47];
-    t10 = $[48];
-  }
-  useEffect(t9, t10);
-  const t11 = updateResult.kind === "loading";
-  let t12;
-  if ($[49] !== t11 || $[50] !== props.hasChanged || $[51] !== props.onReset || $[52] !== onDelete || $[53] !== onDuplicate || $[54] !== onCopy || $[55] !== onPaste || $[56] !== viewHref || $[57] !== previewHref) {
-    t12 = /*#__PURE__*/jsx(HeaderActions, {
-      formID: "item-edit-form",
-      isLoading: t11,
-      hasChanged: props.hasChanged,
-      onDelete: onDelete,
-      onDuplicate: onDuplicate,
-      onCopy: onCopy,
-      onPaste: onPaste,
-      onReset: props.onReset,
-      viewHref: viewHref,
-      previewHref: previewHref
-    });
-    $[49] = t11;
-    $[50] = props.hasChanged;
-    $[51] = props.onReset;
-    $[52] = onDelete;
-    $[53] = onDuplicate;
-    $[54] = onCopy;
-    $[55] = onPaste;
-    $[56] = viewHref;
-    $[57] = previewHref;
-    $[58] = t12;
-  } else {
-    t12 = $[58];
-  }
-  let t13;
-  if ($[59] !== updateResult) {
-    t13 = updateResult.kind === "error" && /*#__PURE__*/jsx(Notice, {
-      tone: "critical",
-      children: updateResult.error.message
-    });
-    $[59] = updateResult;
-    $[60] = t13;
-  } else {
-    t13 = $[60];
-  }
-  let t14;
-  if ($[61] !== deleteResult) {
-    t14 = deleteResult.kind === "error" && /*#__PURE__*/jsx(Notice, {
-      tone: "critical",
-      children: deleteResult.error.message
-    });
-    $[61] = deleteResult;
-    $[62] = t14;
-  } else {
-    t14 = $[62];
-  }
-  let t15;
-  if ($[63] !== onUpdate) {
-    t15 = event_0 => {
-      if (event_0.target !== event_0.currentTarget) {
+      });
+    }
+  });
+  const viewHref = config.storage.kind !== 'local' && repoInfo ? `${getRepoUrl(repoInfo)}${formatInfo.dataLocation === 'index' ? `/tree/${currentBranch}/${(_getPathPrefix = getPathPrefix(config.storage)) !== null && _getPathPrefix !== void 0 ? _getPathPrefix : ''}${currentBasePath}` : `/blob/${currentBranch}/${(_getPathPrefix2 = getPathPrefix(config.storage)) !== null && _getPathPrefix2 !== void 0 ? _getPathPrefix2 : ''}${currentBasePath}${getDataFileExtension(formatInfo)}`}` : undefined;
+  const formID = 'item-edit-form';
+
+  // allow shortcuts "cmd+s" and "ctrl+s" to save
+  useEffect(() => {
+    const listener = event => {
+      if (updateResult.kind === 'loading') {
         return;
       }
-      event_0.preventDefault();
-      onUpdate();
+      if (isHotkey('mod+s', event)) {
+        event.preventDefault();
+        onUpdate();
+      }
     };
-    $[63] = onUpdate;
-    $[64] = t15;
-  } else {
-    t15 = $[64];
-  }
-  const t16 = props.previewProps;
-  let t17;
-  if ($[65] !== t16 || $[66] !== forceValidation || $[67] !== collectionConfig.entryLayout || $[68] !== formatInfo || $[69] !== slugInfo) {
-    t17 = /*#__PURE__*/jsx(FormForEntry, {
-      previewProps: t16,
-      forceValidation: forceValidation,
-      entryLayout: collectionConfig.entryLayout,
-      formatInfo: formatInfo,
-      slugField: slugInfo
-    });
-    $[65] = t16;
-    $[66] = forceValidation;
-    $[67] = collectionConfig.entryLayout;
-    $[68] = formatInfo;
-    $[69] = slugInfo;
-    $[70] = t17;
-  } else {
-    t17 = $[70];
-  }
-  let t18;
-  if ($[71] !== t15 || $[72] !== t17) {
-    t18 = /*#__PURE__*/jsx(Box, {
-      id: "item-edit-form",
-      height: "100%",
-      minHeight: 0,
-      minWidth: 0,
-      elementType: "form",
-      onSubmit: t15,
-      children: t17
-    });
-    $[71] = t15;
-    $[72] = t17;
-    $[73] = t18;
-  } else {
-    t18 = $[73];
-  }
-  let t19;
-  if ($[74] !== updateResult || $[75] !== collection || $[76] !== router || $[77] !== itemSlug || $[78] !== collectionConfig || $[79] !== props || $[80] !== parentOnUpdate || $[81] !== baseCommit) {
-    t19 = updateResult.kind === "needs-new-branch" && /*#__PURE__*/jsx(CreateBranchDuringUpdateDialog, {
-      branchOid: baseCommit,
-      onCreate: async newBranch => {
-        const itemBasePath = `/keystatic/branch/${encodeURIComponent(newBranch)}/collection/${encodeURIComponent(collection)}/item/`;
-        router.push(itemBasePath + encodeURIComponent(itemSlug));
-        const slug_0 = getSlugFromState(collectionConfig, props.state);
-        const hasUpdated_0 = await parentOnUpdate({
-          branch: newBranch,
-          sha: baseCommit
-        });
-        if (hasUpdated_0 && slug_0 !== itemSlug) {
-          router.replace(itemBasePath + encodeURIComponent(slug_0));
-        }
-      },
-      reason: updateResult.reason,
-      onDismiss: props.onResetUpdateItem
-    });
-    $[74] = updateResult;
-    $[75] = collection;
-    $[76] = router;
-    $[77] = itemSlug;
-    $[78] = collectionConfig;
-    $[79] = props;
-    $[80] = parentOnUpdate;
-    $[81] = baseCommit;
-    $[82] = t19;
-  } else {
-    t19 = $[82];
-  }
-  let t20;
-  if ($[83] !== props.onResetUpdateItem || $[84] !== t19) {
-    t20 = /*#__PURE__*/jsx(DialogContainer, {
-      onDismiss: props.onResetUpdateItem,
-      children: t19
-    });
-    $[83] = props.onResetUpdateItem;
-    $[84] = t19;
-    $[85] = t20;
-  } else {
-    t20 = $[85];
-  }
-  let t21;
-  if ($[86] !== updateResult.kind || $[87] !== props || $[88] !== collectionConfig || $[89] !== itemSlug || $[90] !== router || $[91] !== collection) {
-    t21 = updateResult.kind === "needs-fork" && isGitHubConfig(props.config) && /*#__PURE__*/jsx(ForkRepoDialog, {
-      onCreate: async () => {
-        const slug_1 = getSlugFromState(collectionConfig, props.state);
-        const hasUpdated_1 = await props.onUpdate();
-        if (hasUpdated_1 && slug_1 !== itemSlug) {
-          router.replace(`${props.basePath}/collection/${encodeURIComponent(collection)}/item/${encodeURIComponent(slug_1)}`);
-        }
-      },
-      onDismiss: props.onResetUpdateItem,
-      config: props.config
-    });
-    $[86] = updateResult.kind;
-    $[87] = props;
-    $[88] = collectionConfig;
-    $[89] = itemSlug;
-    $[90] = router;
-    $[91] = collection;
-    $[92] = t21;
-  } else {
-    t21 = $[92];
-  }
-  let t22;
-  if ($[93] !== props.onResetUpdateItem || $[94] !== t21) {
-    t22 = /*#__PURE__*/jsx(DialogContainer, {
-      onDismiss: props.onResetUpdateItem,
-      children: t21
-    });
-    $[93] = props.onResetUpdateItem;
-    $[94] = t21;
-    $[95] = t22;
-  } else {
-    t22 = $[95];
-  }
-  let t23;
-  if ($[96] !== deleteResult.kind || $[97] !== props || $[98] !== deleteItem || $[99] !== router || $[100] !== collection || $[101] !== resetDeleteItem) {
-    t23 = deleteResult.kind === "needs-fork" && isGitHubConfig(props.config) && /*#__PURE__*/jsx(ForkRepoDialog, {
-      onCreate: async () => {
-        await deleteItem();
-        router.push(`${props.basePath}/collection/${encodeURIComponent(collection)}`);
-      },
-      onDismiss: resetDeleteItem,
-      config: props.config
-    });
-    $[96] = deleteResult.kind;
-    $[97] = props;
-    $[98] = deleteItem;
-    $[99] = router;
-    $[100] = collection;
-    $[101] = resetDeleteItem;
-    $[102] = t23;
-  } else {
-    t23 = $[102];
-  }
-  let t24;
-  if ($[103] !== resetDeleteItem || $[104] !== t23) {
-    t24 = /*#__PURE__*/jsx(DialogContainer, {
-      onDismiss: resetDeleteItem,
-      children: t23
-    });
-    $[103] = resetDeleteItem;
-    $[104] = t23;
-    $[105] = t24;
-  } else {
-    t24 = $[105];
-  }
-  let t25;
-  if ($[106] !== t12 || $[107] !== props || $[108] !== t13 || $[109] !== t14 || $[110] !== t18 || $[111] !== t20 || $[112] !== t22 || $[113] !== t24) {
-    t25 = /*#__PURE__*/jsx(Fragment, {
-      children: /*#__PURE__*/jsxs(ItemPageShell, {
-        headerActions: t12,
-        ...props,
-        children: [t13, t14, t18, t20, t22, t24]
-      })
-    });
-    $[106] = t12;
-    $[107] = props;
-    $[108] = t13;
-    $[109] = t14;
-    $[110] = t18;
-    $[111] = t20;
-    $[112] = t22;
-    $[113] = t24;
-    $[114] = t25;
-  } else {
-    t25 = $[114];
-  }
-  return t25;
+    document.addEventListener('keydown', listener);
+    return () => document.removeEventListener('keydown', listener);
+  }, [updateResult.kind, onUpdate]);
+  return /*#__PURE__*/jsx(Fragment, {
+    children: /*#__PURE__*/jsxs(ItemPageShell, {
+      headerActions: /*#__PURE__*/jsx(HeaderActions, {
+        formID: formID,
+        isLoading: updateResult.kind === 'loading',
+        hasChanged: props.hasChanged,
+        onDelete: onDelete,
+        onDuplicate: onDuplicate,
+        onCopy: onCopy,
+        onPaste: onPaste,
+        onReset: props.onReset,
+        viewHref: viewHref,
+        previewHref: previewHref
+      }),
+      ...props,
+      children: [updateResult.kind === 'error' && /*#__PURE__*/jsx(Notice, {
+        tone: "critical",
+        children: updateResult.error.message
+      }), deleteResult.kind === 'error' && /*#__PURE__*/jsx(Notice, {
+        tone: "critical",
+        children: deleteResult.error.message
+      }), /*#__PURE__*/jsx(Box, {
+        id: formID,
+        height: "100%",
+        minHeight: 0,
+        minWidth: 0,
+        elementType: "form",
+        onSubmit: event_0 => {
+          if (event_0.target !== event_0.currentTarget) return;
+          event_0.preventDefault();
+          onUpdate();
+        },
+        children: /*#__PURE__*/jsx(FormForEntry, {
+          previewProps: props.previewProps,
+          forceValidation: forceValidation,
+          entryLayout: collectionConfig.entryLayout,
+          formatInfo: formatInfo,
+          slugField: slugInfo
+        })
+      }), /*#__PURE__*/jsx(DialogContainer
+      // ideally this would be a popover on desktop but using a DialogTrigger wouldn't work since
+      // this doesn't open on click but after doing a network request and it failing and manually wiring about a popover and modal would be a pain
+      , {
+        onDismiss: props.onResetUpdateItem,
+        children: updateResult.kind === 'needs-new-branch' && /*#__PURE__*/jsx(CreateBranchDuringUpdateDialog, {
+          branchOid: baseCommit,
+          onCreate: async newBranch => {
+            const itemBasePath = `/keystatic/branch/${encodeURIComponent(newBranch)}/collection/${encodeURIComponent(collection)}/item/`;
+            router.push(itemBasePath + encodeURIComponent(itemSlug));
+            const slug_0 = getSlugFromState(collectionConfig, props.state);
+            const hasUpdated_0 = await parentOnUpdate({
+              branch: newBranch,
+              sha: baseCommit
+            });
+            if (hasUpdated_0 && slug_0 !== itemSlug) {
+              router.replace(itemBasePath + encodeURIComponent(slug_0));
+            }
+          },
+          reason: updateResult.reason,
+          onDismiss: props.onResetUpdateItem
+        })
+      }), /*#__PURE__*/jsx(DialogContainer
+      // ideally this would be a popover on desktop but using a DialogTrigger
+      // wouldn't work since this doesn't open on click but after doing a
+      // network request and it failing and manually wiring about a popover
+      // and modal would be a pain
+      , {
+        onDismiss: props.onResetUpdateItem,
+        children: updateResult.kind === 'needs-fork' && isGitHubConfig(props.config) && /*#__PURE__*/jsx(ForkRepoDialog, {
+          onCreate: async () => {
+            const slug_1 = getSlugFromState(collectionConfig, props.state);
+            const hasUpdated_1 = await props.onUpdate();
+            if (hasUpdated_1 && slug_1 !== itemSlug) {
+              router.replace(`${props.basePath}/collection/${encodeURIComponent(collection)}/item/${encodeURIComponent(slug_1)}`);
+            }
+          },
+          onDismiss: props.onResetUpdateItem,
+          config: props.config
+        })
+      }), /*#__PURE__*/jsx(DialogContainer
+      // ideally this would be a popover on desktop but using a DialogTrigger
+      // wouldn't work since this doesn't open on click but after doing a
+      // network request and it failing and manually wiring about a popover
+      // and modal would be a pain
+      , {
+        onDismiss: resetDeleteItem,
+        children: deleteResult.kind === 'needs-fork' && isGitHubConfig(props.config) && /*#__PURE__*/jsx(ForkRepoDialog, {
+          onCreate: async () => {
+            await deleteItem();
+            router.push(`${props.basePath}/collection/${encodeURIComponent(collection)}`);
+          },
+          onDismiss: resetDeleteItem,
+          config: props.config
+        })
+      })]
+    })
+  });
 }
 function LocalItemPage(props) {
   var _draft$state;

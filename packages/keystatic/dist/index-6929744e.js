@@ -18528,7 +18528,7 @@ function getSrcPrefixForImageBlock$1(documentFeatures, slug) {
 
 function serializeProps$1(rootValue, rootSchema,
 // note you might have a slug without a slug field when serializing props inside a component block or etc. in the editor
-slugField, slug, shouldSuggestFilenamePrefix) {
+slugField, slug, shouldSuggestFilenamePrefix, serializeContentAsString = false) {
   const extraFiles = [];
   return {
     value: transformProps(rootSchema, rootValue, {
@@ -18561,11 +18561,14 @@ slugField, slug, shouldSuggestFilenamePrefix) {
         }
         if (schema.formKind === 'content' || schema.formKind === 'assets') {
           let other, external, forYaml;
+          let contentForPreview;
           if (schema.formKind === 'content') {
             const out = schema.serialize(value, {
               slug
             });
-            if (out.content) {
+            if (out.content && serializeContentAsString) {
+              contentForPreview = new TextDecoder().decode(out.content);
+            } else if (out.content) {
               extraFiles.push({
                 path: getPropPathPortion(propPath, rootSchema, rootValue) + schema.contentExtension,
                 contents: out.content,
@@ -18607,7 +18610,7 @@ slugField, slug, shouldSuggestFilenamePrefix) {
               });
             }
           }
-          return forYaml;
+          return serializeContentAsString && schema.formKind === 'content' ? contentForPreview : forYaml;
         }
         return schema.serialize(value).value;
       },

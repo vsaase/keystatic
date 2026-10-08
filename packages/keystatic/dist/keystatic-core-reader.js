@@ -1,9 +1,9 @@
 import nodePath from 'node:path';
 import nodeFs from 'node:fs/promises';
-import { c as collectionReader, s as singletonReader } from './generic-d479c3e9.js';
+import { c as collectionReader, s as singletonReader } from './generic-fbb9b95d.js';
 import 'react';
 import '@keystar/ui/picker';
-import './index-cd3e9986.js';
+import './index-6929744e.js';
 import '@markdoc/markdoc/dist/index.mjs';
 import './react-compiler-runtime-0011f46e.js';
 import '@keystar/ui/field';
