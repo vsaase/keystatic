@@ -1,9 +1,18 @@
 import { Config } from '@keystatic/core';
 import { Keystatic } from '@keystatic/core/ui';
 
-export function makePage(config: Config<any, any>) {
+export function makePage(
+  config: Config<any, any>,
+  options?: { getPortalContainer?: () => HTMLElement | null }
+) {
   return function Page() {
-    return <Keystatic config={config} appSlug={appSlug} />;
+    return (
+      <Keystatic
+        config={config}
+        appSlug={appSlug}
+        getPortalContainer={options?.getPortalContainer}
+      />
+    );
   };
 }
 

@@ -5,6 +5,10 @@ import {
   component,
   fields,
 } from '..';
+import { serializeEntryToFiles } from '../app/updating';
+import { parseEntry } from '../app/useItemData';
+import type { FormatInfo } from '../app/path-utils';
+import { getDirectoriesForTreeKey } from '../app/tree-key';
 import { getInitialPropsValue } from './initial-values';
 import { serializeProps as _serializeProps } from './serialize-props';
 
@@ -21,6 +25,7 @@ const serializeProps: <Schema extends ComponentSchema>(
     path: string;
     parent: string | undefined;
     contents: Uint8Array;
+    directoryPerEntry?: boolean;
   }[];
 } = _serializeProps as any;
 
@@ -73,6 +78,84 @@ test('serialize image in collection', () => {
       },
     }
   `);
+});
+
+test('preserve images in a shared directory when editing an entry', () => {
+  const schema = {
+    title: fields.slug({ name: { label: 'Title' } }),
+    image: fields.image({
+      label: 'Image',
+      directory: 'public/uploads',
+      directoryPerEntry: false,
+    }),
+  };
+  const imagePath = '2025/02/Headphones_Banner.png';
+  const imageContents = new Uint8Array([1, 2, 3]);
+  const entrySchema = fields.object(schema);
+  const format: FormatInfo = {
+    data: 'yaml',
+    dataLocation: 'outer',
+    contentField: undefined,
+  };
+  const directories = getDirectoriesForTreeKey(
+    entrySchema,
+    'src/content/pages/home',
+    'home',
+    format
+  );
+  expect(directories).toContain('public/uploads');
+  expect(directories).not.toContain('public/uploads/home');
+
+  const parsed = parseEntry(
+    {
+      dirpath: 'src/content/pages/home',
+      format,
+      schema,
+      slug: { slug: 'home', field: 'title' },
+    },
+    new Map([
+      [
+        'src/content/pages/home.yaml',
+        new TextEncoder().encode(`title: Home\nimage: ${imagePath}\n`),
+      ],
+      [`public/uploads/${imagePath}`, imageContents],
+    ])
+  );
+
+  expect(parsed.initialState.image).toEqual({
+    data: imageContents,
+    extension: 'png',
+    filename: imagePath,
+  });
+  expect(parsed.initialFiles).toEqual(['src/content/pages/home.yaml']);
+
+  const serialized = _serializeProps(
+    { image: parsed.initialState.image },
+    fields.object({ image: schema.image }),
+    undefined,
+    'home',
+    true
+  );
+  expect(serialized.value).toEqual({ image: imagePath });
+  expect(serialized.extraFiles).toEqual([
+    {
+      path: imagePath,
+      parent: 'public/uploads',
+      contents: imageContents,
+      directoryPerEntry: false,
+    },
+  ]);
+
+  const writtenFiles = serializeEntryToFiles({
+    basePath: 'src/content/pages/home',
+    schema: { image: schema.image },
+    format,
+    state: { image: parsed.initialState.image },
+    slug: undefined,
+  });
+  expect(writtenFiles.map(file => file.path)).toContain(
+    `public/uploads/${imagePath}`
+  );
 });
 
 test('serialize image in singleton', () => {

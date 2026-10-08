@@ -4,9 +4,11 @@ import { ComponentSchema } from '..';
 import { fixPath, FormatInfo, getDataFileExtension } from './path-utils';
 import { getTreeNodeAtPath, TreeNode } from './trees';
 
-function collectDirectoriesUsedInSchemaInner(
+type DirectoryUse = { path: string; directoryPerEntry: boolean };
+
+function collectDirectoryUsesInSchemaInner(
   schema: ComponentSchema,
-  directories: Set<string>,
+  directories: Map<string, DirectoryUse>,
   seenSchemas: Set<ComponentSchema>
 ): void {
   if (seenSchemas.has(schema)) {
@@ -14,7 +16,7 @@ function collectDirectoriesUsedInSchemaInner(
   }
   seenSchemas.add(schema);
   if (schema.kind === 'array') {
-    return collectDirectoriesUsedInSchemaInner(
+    return collectDirectoryUsesInSchemaInner(
       schema.element,
       directories,
       seenSchemas
@@ -25,27 +27,36 @@ function collectDirectoriesUsedInSchemaInner(
   }
   if (schema.kind === 'form') {
     if (schema.formKind === 'asset' && schema.directory !== undefined) {
-      directories.add(fixPath(schema.directory));
+      const path = fixPath(schema.directory);
+      const directoryPerEntry = schema.directoryPerEntry !== false;
+      directories.set(`${path}\0${directoryPerEntry}`, {
+        path,
+        directoryPerEntry,
+      });
     }
     if (
       (schema.formKind === 'content' || schema.formKind === 'assets') &&
       schema.directories !== undefined
     ) {
       for (const directory of schema.directories) {
-        directories.add(fixPath(directory));
+        const path = fixPath(directory);
+        directories.set(`${path}\0true`, {
+          path,
+          directoryPerEntry: true,
+        });
       }
     }
     return;
   }
   if (schema.kind === 'object') {
     for (const field of Object.values(schema.fields)) {
-      collectDirectoriesUsedInSchemaInner(field, directories, seenSchemas);
+      collectDirectoryUsesInSchemaInner(field, directories, seenSchemas);
     }
     return;
   }
   if (schema.kind === 'conditional') {
     for (const innerSchema of Object.values(schema.values)) {
-      collectDirectoriesUsedInSchemaInner(
+      collectDirectoryUsesInSchemaInner(
         innerSchema,
         directories,
         seenSchemas
@@ -56,12 +67,18 @@ function collectDirectoriesUsedInSchemaInner(
   assertNever(schema);
 }
 
+function collectDirectoryUsesInSchema(
+  schema: ComponentSchema
+): DirectoryUse[] {
+  const directories = new Map<string, DirectoryUse>();
+  collectDirectoryUsesInSchemaInner(schema, directories, new Set());
+  return [...directories.values()];
+}
+
 export function collectDirectoriesUsedInSchema(
   schema: ComponentSchema
 ): Set<string> {
-  const directories = new Set<string>();
-  collectDirectoriesUsedInSchemaInner(schema, directories, new Set());
-  return directories;
+  return new Set(collectDirectoryUsesInSchema(schema).map(x => x.path));
 }
 
 export function getDirectoriesForTreeKey(
@@ -75,8 +92,10 @@ export function getDirectoriesForTreeKey(
     directories.push(fixPath(directory) + getDataFileExtension(format));
   }
   const toAdd = slug === undefined ? '' : `/${slug}`;
-  for (const directory of collectDirectoriesUsedInSchema(schema)) {
-    directories.push(directory + toAdd);
+  for (const directory of collectDirectoryUsesInSchema(schema)) {
+    directories.push(
+      directory.path + (directory.directoryPerEntry ? toAdd : '')
+    );
   }
   return directories;
 }

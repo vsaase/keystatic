@@ -127,24 +127,29 @@ export function parseEntry(
           return schema.parse(value, { slug: args.slug.slug });
         }
         if (schema.formKind === 'asset') {
+          const directoryPerEntry = schema.directoryPerEntry !== false;
           const suggestedFilenamePrefix = pathWithArrayFieldSlugs.join('/');
           const filepath = schema.filename(value, {
             suggestedFilenamePrefix,
             slug: args.slug?.slug,
           });
-          const asset = filepath
-            ? getFile(
-                `${
-                  schema.directory
-                    ? `${schema.directory}${
-                        args.slug?.slug === undefined
-                          ? ''
-                          : `/${args.slug.slug}`
-                      }`
-                    : args.dirpath
-                }/${filepath}`
-              )
+          const assetPath = filepath
+            ? `${
+                schema.directory
+                  ? `${schema.directory}${
+                      directoryPerEntry && args.slug?.slug !== undefined
+                        ? `/${args.slug.slug}`
+                        : ''
+                    }`
+                  : args.dirpath
+              }/${filepath}`
             : undefined;
+          const asset =
+            assetPath === undefined
+              ? undefined
+              : schema.directory && !directoryPerEntry
+                ? filesWithFakeFile.get(assetPath)
+                : getFile(assetPath);
 
           return schema.parse(value, { asset, slug: args.slug?.slug });
         }

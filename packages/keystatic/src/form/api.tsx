@@ -96,6 +96,11 @@ export type AssetFormField<
   formKind: 'asset';
   Input(props: FormFieldInputProps<ParsedValue>): ReactElement | null;
   directory?: string;
+  /**
+   * Whether assets are stored in a subdirectory named after the entry slug.
+   * @default true
+   */
+  directoryPerEntry?: boolean;
   defaultValue(): ParsedValue;
   filename(
     value: FormFieldStoredValue,

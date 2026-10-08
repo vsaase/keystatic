@@ -44,6 +44,7 @@ import { KeystaticCloudAuthCallback } from './cloud-auth-callback';
 import { getAuth } from './auth';
 import { assertValidRepoConfig } from './repo-config';
 import { NotFoundBoundary, notFound } from './not-found';
+import { UNSAFE_PortalProvider } from 'react-aria/PortalProvider';
 
 function parseParamsWithoutBranch(params: string[]) {
   if (params.length === 0) {
@@ -292,6 +293,7 @@ function RedirectToLoopback(props: { children: ReactNode }) {
 export function Keystatic(props: {
   config: Config;
   appSlug?: { envName: string; value: string | undefined };
+  getPortalContainer?: () => HTMLElement | null;
 }) {
   if (props.config.storage.kind === 'github') {
     assertValidRepoConfig(props.config.storage.repo);
@@ -301,7 +303,7 @@ export function Keystatic(props: {
   const Wrapper =
     props.config.storage.kind === 'local' ? Fragment : RedirectToLoopback;
 
-  return (
+  const app = (
     <ClientOnly>
       <Wrapper>
         <AppSlugProvider value={props.appSlug}>
@@ -313,6 +315,14 @@ export function Keystatic(props: {
         </AppSlugProvider>
       </Wrapper>
     </ClientOnly>
+  );
+
+  return props.getPortalContainer ? (
+    <UNSAFE_PortalProvider getContainer={props.getPortalContainer}>
+      {app}
+    </UNSAFE_PortalProvider>
+  ) : (
+    app
   );
 }
 

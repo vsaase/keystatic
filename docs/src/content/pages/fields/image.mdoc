@@ -102,6 +102,18 @@ Here's how the `avatar` field would now be stored with our `john-doe` example:
 avatar: /images/avatars/john-doe/avatar.jpg
 ``` 
 
+### Shared directories
+
+By default, assets in a configured directory are stored in a subdirectory for each entry slug. Set `directoryPerEntry: false` when entries share a directory of existing assets. The stored value then remains relative to the configured directory, and editing one entry will not delete shared assets.
+
+```typescript
+fields.image({
+  label: 'Image',
+  directory: 'public/uploads',
+  directoryPerEntry: false,
+})
+```
+
 ---
 
 ## Screencast walk-through

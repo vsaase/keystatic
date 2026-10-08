@@ -33,6 +33,7 @@ import { base64Encode } from '#base64';
 const textEncoder = new TextEncoder();
 
 const frontmatterSplit = textEncoder.encode('---\n');
+const entrySavedEvent = 'keystatic:entry-saved';
 
 function combineFrontmatterAndContents(
   frontmatter: Uint8Array,
@@ -97,7 +98,9 @@ export function serializeEntryToFiles(args: {
       path: `${
         file.parent
           ? args.slug
-            ? `${file.parent}/${args.slug.value}`
+            ? `${file.parent}${
+                file.directoryPerEntry === false ? '' : `/${args.slug.value}`
+              }`
             : file.parent
           : args.basePath
       }/${file.path}`,
@@ -305,6 +308,7 @@ export function useUpsertItem(args: {
           const target = result.data?.createCommitOnBranch?.ref?.target;
           if (target) {
             setState({ kind: 'updated' });
+            window.dispatchEvent(new Event(entrySavedEvent));
             return true;
           }
           throw new Error('Failed to update');
@@ -330,6 +334,7 @@ export function useUpsertItem(args: {
           const { tree } = await hydrateTreeCacheWithEntries(newTree);
           setTreeSha(await treeSha(tree));
           setState({ kind: 'updated' });
+          window.dispatchEvent(new Event(entrySavedEvent));
           return true;
         }
       } catch (err) {

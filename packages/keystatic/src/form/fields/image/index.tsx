@@ -11,10 +11,12 @@ export function image<IsRequired extends boolean | undefined>({
   validation,
   description,
   publicPath,
+  directoryPerEntry = true,
   transformFilename,
 }: {
   label: string;
   directory?: string;
+  directoryPerEntry?: boolean;
   validation?: { isRequired?: IsRequired };
   description?: string;
   publicPath?: string;
@@ -50,7 +52,12 @@ export function image<IsRequired extends boolean | undefined>({
     },
     filename(value, args) {
       if (typeof value === 'string') {
-        return value.slice(getSrcPrefix(publicPath, args.slug).length);
+        return value.slice(
+          getSrcPrefix(
+            publicPath,
+            directoryPerEntry ? args.slug : undefined
+          ).length
+        );
       }
       return undefined;
     },
@@ -66,7 +73,12 @@ export function image<IsRequired extends boolean | undefined>({
       }
       return {
         data: args.asset,
-        filename: value.slice(getSrcPrefix(publicPath, args.slug).length),
+        filename: value.slice(
+          getSrcPrefix(
+            publicPath,
+            directoryPerEntry ? args.slug : undefined
+          ).length
+        ),
         extension: value.match(/\.([^.]+$)/)?.[1] ?? '',
       };
     },
@@ -82,11 +94,17 @@ export function image<IsRequired extends boolean | undefined>({
         ? args.suggestedFilenamePrefix + '.' + value.extension
         : value.filename;
       return {
-        value: `${getSrcPrefix(publicPath, args.slug)}${filename}`,
+        value: `${
+          getSrcPrefix(
+            publicPath,
+            directoryPerEntry ? args.slug : undefined
+          )
+        }${filename}`,
         asset: { filename, content: value.data },
       };
     },
     directory: directory ? fixPath(directory) : undefined,
+    directoryPerEntry,
     reader: {
       parse(value) {
         if (typeof value !== 'string' && value !== undefined) {

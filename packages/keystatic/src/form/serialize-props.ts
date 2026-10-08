@@ -15,6 +15,7 @@ export function serializeProps(
     path: string;
     parent: string | undefined;
     contents: Uint8Array;
+    directoryPerEntry?: boolean;
   }[] = [];
   return {
     value: transformProps(rootSchema, rootValue, {
@@ -27,7 +28,8 @@ export function serializeProps(
         }
         if (schema.formKind === 'asset') {
           const { asset, value: forYaml } = schema.serialize(value, {
-            suggestedFilenamePrefix: shouldSuggestFilenamePrefix
+            suggestedFilenamePrefix:
+              shouldSuggestFilenamePrefix && schema.directoryPerEntry !== false
               ? getPropPathPortion(propPath, rootSchema, rootValue)
               : undefined,
             slug,
@@ -37,6 +39,9 @@ export function serializeProps(
               path: asset.filename,
               contents: asset.content,
               parent: schema.directory,
+              ...(schema.directoryPerEntry === false
+                ? { directoryPerEntry: false }
+                : {}),
             });
           }
           return forYaml;

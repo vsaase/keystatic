@@ -124,7 +124,10 @@ export function BlocksFieldInput(
         <FieldMessage {...errorMessageProps}>{errorMessage}</FieldMessage>
       )}
 
-      <DialogContainer onDismiss={dismiss}>
+      <DialogContainer
+        isDismissable={modalState.kind === 'edit'}
+        onDismiss={dismiss}
+      >
         {(() => {
           if (modalState.kind === 'closed') {
             return null;
